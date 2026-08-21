@@ -437,15 +437,15 @@ async function ripGrep(
 // ============================================================================
 
 const GLOB_SCHEMA = Type.Object({
+    path: Type.Optional(
+        Type.String({
+            description:
+                'The directory to search in. If not specified, the current working directory will be used. IMPORTANT: Omit this field to use the default directory. DO NOT enter "undefined" or "null" - simply omit it for the default behavior. Must be a valid directory path if provided.',
+        }),
+    ),
 	pattern: Type.String({
 		description: "The glob pattern to match files against",
 	}),
-	path: Type.Optional(
-		Type.String({
-			description:
-				'The directory to search in. If not specified, the current working directory will be used. IMPORTANT: Omit this field to use the default directory. DO NOT enter "undefined" or "null" - simply omit it for the default behavior. Must be a valid directory path if provided.',
-		}),
-	),
 });
 
 async function executeGlob(
