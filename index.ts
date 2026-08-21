@@ -54,31 +54,34 @@ import {
 	resolve,
 	sep,
 } from "node:path";
-import { fileURLToPath } from "node:url";
 import type {
 	ExtensionAPI,
 	ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 
-// ============================================================================
-// Config
-// ============================================================================
-
 /** Tool names the glob tool may be registered as. */
 const VALID_TOOL_NAMES = ["Glob", "find"] as const;
 type ToolName = (typeof VALID_TOOL_NAMES)[number];
 
 /**
- * Resolve the config.json path. The file is a sibling of this module
- * (`extensions/picc-glob/config.json`). Override at runtime via
- * PICC_GLOB_CONFIG_PATH.
+ * Resolve the config.json path.
+ * Default: `~/.pi/agent/extensions/picc-glob/config.json` (stable, outside
+ * node_modules, so it survives reinstalls — the package itself may live in
+ * `~/.pi/agent/npm/node_modules/` when installed via `pi install npm:`).
+ * Override at runtime via PICC_GLOB_CONFIG_PATH.
  */
 function resolveConfigPath(): string {
 	const env = process.env.PICC_GLOB_CONFIG_PATH;
 	if (env) return env;
-	const here = dirname(fileURLToPath(import.meta.url));
-	return join(here, "config.json");
+	return join(
+		homedir(),
+		".pi",
+		"agent",
+		"extensions",
+		"picc-glob",
+		"config.json",
+	);
 }
 
 function readToolNameFromConfig(): ToolName | undefined {
@@ -437,12 +440,12 @@ async function ripGrep(
 // ============================================================================
 
 const GLOB_SCHEMA = Type.Object({
-    path: Type.Optional(
-        Type.String({
-            description:
-                'The directory to search in. If not specified, the current working directory will be used. IMPORTANT: Omit this field to use the default directory. DO NOT enter "undefined" or "null" - simply omit it for the default behavior. Must be a valid directory path if provided.',
-        }),
-    ),
+	path: Type.Optional(
+		Type.String({
+			description:
+				'The directory to search in. If not specified, the current working directory will be used. IMPORTANT: Omit this field to use the default directory. DO NOT enter "undefined" or "null" - simply omit it for the default behavior. Must be a valid directory path if provided.',
+		}),
+	),
 	pattern: Type.String({
 		description: "The glob pattern to match files against",
 	}),
