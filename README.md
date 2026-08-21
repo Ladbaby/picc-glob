@@ -8,13 +8,9 @@ Part of [picc](https://github.com/Ladbaby/picc), a pi agent setup mirroring Clau
 > port of Claude Code. This extension replicates Claude Code's `Glob` exactly:
 > `rg --files --glob <pattern> --sort=modified --no-ignore --hidden <dir>`.
 
-## Why an extension?
+## Usage
 
-pi has no `settings.json` key or env var that controls the active tool set — the
-default active tools are hardcoded. The only way to add a tool **without passing
-launch parameters to `pi`** is a pi extension that calls `pi.registerTool(...)`.
-This extension does exactly that, and is auto-discovered from
-`~/.pi/agent/extensions/picc-glob`.
+Install via `pi install npm:@ladbabynpm/picc-glob`.
 
 ## Tool
 
@@ -47,21 +43,6 @@ packages):
 ```json
 { "toolName": "Glob" }
 ```
-
-## Install
-
-```bash
-# dev
-npm install
-npm run lint
-npm run typecheck
-
-# link into pi (Windows uses a junction; other OSes a symlink)
-powershell -Command "New-Item -ItemType Junction -Path `"$HOME/.pi/agent/extensions/picc-glob`" -Target `"<path>/picc-glob`""
-```
-
-Then restart pi. The tool appears with the configured name and is immediately
-callable by the LLM.
 
 ## Development
 
