@@ -37,8 +37,7 @@ Install via `pi install npm:@ladbabynpm/picc-glob`.
 
 Precedence for the tool name: `PICC_GLOB_TOOL_NAME` env > `config.json` > `"Glob"`.
 
-`config.json` lives next to `index.ts` (and is git-ignored, like the other picc
-packages):
+`config.json` is read from `~/.pi/agent/extensions/picc-glob/config.json` by default.
 
 ```json
 { "toolName": "Glob" }
