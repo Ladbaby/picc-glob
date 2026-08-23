@@ -315,7 +315,31 @@ function runRipgrepOnce(
 		let stderrTruncated = false;
 		let settled = false;
 		let killedByTimeout = false;
+		let killedByAbort = false;
 		let killTimeoutId: ReturnType<typeof setTimeout> | undefined;
+
+		// Explicit abort handler: Node's `spawn` `signal` option is unreliable on
+		// Windows (the internal signal→child.kill() wiring can fail to fire,
+		// leaving `rg` running and this promise hanging until the process is
+		// manually killed). Kill the child directly so termination is
+		// deterministic. Mirrors picc-bash's onAbort handler.
+		const onAbort = () => {
+			if (settled) return;
+			killedByAbort = true;
+			if (platform() === "win32") {
+				child.kill();
+			} else {
+				child.kill("SIGTERM");
+				const t = setTimeout(() => child.kill("SIGKILL"), 5_000);
+				if (killTimeoutId) clearTimeout(killTimeoutId);
+				killTimeoutId = t;
+			}
+		};
+		if (abortSignal.aborted) {
+			onAbort();
+		} else {
+			abortSignal.addEventListener("abort", onAbort, { once: true });
+		}
 
 		child.stdout?.on("data", (data: Buffer) => {
 			if (!stdoutTruncated) {
@@ -351,11 +375,23 @@ function runRipgrepOnce(
 			settled = true;
 			clearTimeout(timeoutId);
 			if (killTimeoutId) clearTimeout(killTimeoutId);
+			abortSignal.removeEventListener("abort", onAbort);
 			resolvePromise(result);
 		};
 
 		child.on("close", (code) => {
-			if (code === 0 || code === 1) {
+			if (killedByAbort) {
+				// The search was cut short by an abort (e.g. the user stopped
+				// the subagent). Report it as an error so the run surfaces the
+				// interruption rather than a misleading exit code, and skip the
+				// EAGAIN retry path.
+				finish({
+					lines: parseLines(stdout),
+					stderr,
+					error: "Ripgrep search was aborted",
+					timedOut: false,
+				});
+			} else if (code === 0 || code === 1) {
 				// 0 = matches found, 1 = no matches — both success.
 				finish({
 					lines: parseLines(stdout),
