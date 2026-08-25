@@ -285,6 +285,10 @@ interface RipgrepOutcome {
 	error: string | null;
 	/** True when the invocation was cut short by the timeout. */
 	timedOut: boolean;
+	/** The signal that terminated the child (e.g. "SIGTERM"/"SIGKILL"), or null. A
+	 *  non-null signal means the process was killed (timeout or abort) rather than
+	 *  exiting on its own — mirroring Claude Code's `error.signal`. */
+	signal: string | null;
 }
 
 /**
@@ -379,7 +383,7 @@ function runRipgrepOnce(
 			resolvePromise(result);
 		};
 
-		child.on("close", (code) => {
+		child.on("close", (code, signal) => {
 			if (killedByAbort) {
 				// The search was cut short by an abort (e.g. the user stopped
 				// the subagent). Report it as an error so the run surfaces the
@@ -390,6 +394,7 @@ function runRipgrepOnce(
 					stderr,
 					error: "Ripgrep search was aborted",
 					timedOut: false,
+					signal,
 				});
 			} else if (code === 0 || code === 1) {
 				// 0 = matches found, 1 = no matches — both success.
@@ -398,6 +403,7 @@ function runRipgrepOnce(
 					stderr,
 					error: null,
 					timedOut: false,
+					signal,
 				});
 			} else {
 				finish({
@@ -405,6 +411,7 @@ function runRipgrepOnce(
 					stderr,
 					error: `ripgrep exited with code ${code}`,
 					timedOut: killedByTimeout,
+					signal,
 				});
 			}
 		});
@@ -415,6 +422,7 @@ function runRipgrepOnce(
 				stderr,
 				error: `${err.message}`,
 				timedOut: false,
+				signal: null,
 			});
 		});
 	});
@@ -456,19 +464,38 @@ async function ripGrep(
 
 	if (result.error === null) return result.lines;
 
-	// A timeout that produced no results is reported as an error so the caller
-	// knows the search did not complete (rather than assuming no matches).
-	if (result.timedOut && result.lines.length === 0) {
+	// An explicit abort is always surfaced as an error, even though it also kills
+	// the child (so `result.signal` may be set). Check this before the timeout
+	// branch so it is not mistaken for a timeout with partial output.
+	if (result.error === "Ripgrep search was aborted") {
+		throw new Error(result.error);
+	}
+
+	// A timeout (or abort) that produced no results is reported as an error so the
+	// caller knows the search did not complete (rather than assuming no matches).
+	const isTimeout = result.signal === "SIGTERM" || result.signal === "SIGKILL";
+	if (isTimeout && result.lines.length === 0) {
 		const secs = Math.round(timeoutMs / 1000);
 		throw new Error(
 			`Ripgrep search timed out after ${secs} seconds. The search may have matched files but did not complete in time. Try searching a more specific path or pattern.`,
 		);
 	}
 
-	// Surface the error; partial lines are intentionally dropped to keep the
-	// port simple and predictable (Claude Code keeps them, but they are at
-	// most the last incomplete line and rarely useful here).
-	throw new Error(result.error);
+	// A timeout that DID produce partial results: drop the last line (it may be a
+	// torn, incomplete path) and return what was already collected, rather than
+	// erroring out. This mirrors Claude Code's `handleResult`, which prefers a
+	// partial result over an error when ripgrep was cut short mid-scan.
+	if (isTimeout) {
+		return result.lines.slice(0, -1);
+	}
+
+	// Any other non-timeout error (e.g. ripgrep usage error / exit 2, or a spawn
+	// failure). Surface it, including captured stderr, so it is not opaque.
+	const detail =
+		result.stderr.trim().length > 0
+			? `${result.error} — ${result.stderr.trim()}`
+			: result.error;
+	throw new Error(detail);
 }
 
 // ============================================================================
