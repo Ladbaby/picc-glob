@@ -320,30 +320,65 @@ function runRipgrepOnce(
 		let settled = false;
 		let killedByTimeout = false;
 		let killedByAbort = false;
+		let timeoutId: ReturnType<typeof setTimeout> | undefined;
 		let killTimeoutId: ReturnType<typeof setTimeout> | undefined;
 
-		// Explicit abort handler: Node's `spawn` `signal` option is unreliable on
-		// Windows (the internal signal→child.kill() wiring can fail to fire,
-		// leaving `rg` running and this promise hanging until the process is
-		// manually killed). Kill the child directly so termination is
-		// deterministic. Mirrors picc-bash's onAbort handler.
+		const finish = (result: RipgrepOutcome) => {
+			if (settled) return;
+			settled = true;
+			if (timeoutId) clearTimeout(timeoutId);
+			if (killTimeoutId) clearTimeout(killTimeoutId);
+			abortSignal.removeEventListener("abort", onAbort);
+			resolvePromise(result);
+		};
+
+		// Kill the child and all its descendants. On Windows `child.kill()` only
+		// kills the direct child (and, when `rg` is resolved from PATH, may be a
+		// `cmd.exe` shim), leaving `rg` running and holding the stdout pipe open
+		// so `close` never fires. Use `taskkill /F /T` to kill the whole tree —
+		// mirrors pi's `killProcessTree` (`taskkill /F /T /PID`).
+		const killChild = (sig: NodeJS.Signals) => {
+			if (platform() === "win32") {
+				if (child.pid !== undefined) {
+					spawn("taskkill", ["/F", "/T", "/PID", String(child.pid)], {
+						stdio: "ignore",
+						detached: true,
+						windowsHide: true,
+					}).unref();
+				}
+				child.kill();
+			} else {
+				child.kill(sig);
+				if (sig === "SIGTERM" && child.pid !== undefined) {
+					if (killTimeoutId) clearTimeout(killTimeoutId);
+					killTimeoutId = setTimeout(() => child.kill("SIGKILL"), 5_000);
+				}
+			}
+		};
+
+		// Explicit abort handler: kill the process tree AND settle the promise
+		// immediately. We cannot rely on `close` firing to resolve — if the
+		// process survives the kill (or a descendant keeps the stdout pipe
+		// open), `close` never fires and this promise would hang, keeping the
+		// calling subagent blocked until the process is manually killed. Mirrors
+		// pi's `find` tool, whose onAbort settles the promise directly.
 		const onAbort = () => {
 			if (settled) return;
 			killedByAbort = true;
-			if (platform() === "win32") {
-				child.kill();
-			} else {
-				child.kill("SIGTERM");
-				const t = setTimeout(() => child.kill("SIGKILL"), 5_000);
-				if (killTimeoutId) clearTimeout(killTimeoutId);
-				killTimeoutId = t;
-			}
+			killChild("SIGTERM");
+			finish({
+				lines: parseLines(stdout),
+				stderr,
+				error: "Ripgrep search was aborted",
+				timedOut: false,
+				signal: "SIGTERM",
+			});
 		};
 		if (abortSignal.aborted) {
 			onAbort();
-		} else {
-			abortSignal.addEventListener("abort", onAbort, { once: true });
+			return;
 		}
+		abortSignal.addEventListener("abort", onAbort, { once: true });
 
 		child.stdout?.on("data", (data: Buffer) => {
 			if (!stdoutTruncated) {
@@ -364,26 +399,24 @@ function runRipgrepOnce(
 			}
 		});
 
-		const timeoutId = setTimeout(() => {
+		// Timeout is a real settle deadline: kill the tree and settle immediately
+		// rather than only killing and waiting for `close`. The outcome shape
+		// mirrors the `close` handler's non-abort branch (non-null error,
+		// timedOut, signal) so downstream handling in `ripGrep` is unchanged.
+		timeoutId = setTimeout(() => {
+			if (settled) return;
 			killedByTimeout = true;
-			if (platform() === "win32") {
-				child.kill();
-			} else {
-				child.kill("SIGTERM");
-				killTimeoutId = setTimeout(() => child.kill("SIGKILL"), 5_000);
-			}
+			killChild("SIGTERM");
+			finish({
+				lines: parseLines(stdout),
+				stderr,
+				error: "Ripgrep search timed out",
+				timedOut: true,
+				signal: "SIGTERM",
+			});
 		}, timeoutMs);
 
-		const finish = (result: RipgrepOutcome) => {
-			if (settled) return;
-			settled = true;
-			clearTimeout(timeoutId);
-			if (killTimeoutId) clearTimeout(killTimeoutId);
-			abortSignal.removeEventListener("abort", onAbort);
-			resolvePromise(result);
-		};
-
-		child.on("close", (code, signal) => {
+		child.on("close", (code, closeSignal) => {
 			if (killedByAbort) {
 				// The search was cut short by an abort (e.g. the user stopped
 				// the subagent). Report it as an error so the run surfaces the
@@ -394,7 +427,7 @@ function runRipgrepOnce(
 					stderr,
 					error: "Ripgrep search was aborted",
 					timedOut: false,
-					signal,
+					signal: closeSignal ?? "SIGTERM",
 				});
 			} else if (code === 0 || code === 1) {
 				// 0 = matches found, 1 = no matches — both success.
@@ -403,7 +436,7 @@ function runRipgrepOnce(
 					stderr,
 					error: null,
 					timedOut: false,
-					signal,
+					signal: closeSignal ?? null,
 				});
 			} else {
 				finish({
@@ -411,7 +444,7 @@ function runRipgrepOnce(
 					stderr,
 					error: `ripgrep exited with code ${code}`,
 					timedOut: killedByTimeout,
-					signal,
+					signal: closeSignal ?? null,
 				});
 			}
 		});
@@ -457,8 +490,14 @@ async function ripGrep(
 	let result = await run(false);
 
 	// EAGAIN (resource-constrained envs): retry once, single-threaded. Claude
-	// Code retries only when the error is EAGAIN and has not yet retried.
-	if (result.error !== null && isEagainError(result.stderr)) {
+	// Code retries only when the error is EAGAIN and has not yet retried. Skip
+	// the retry if the abort fired while the first run was settling, so we do
+	// not spawn a second orphaned `rg` after the caller already cancelled.
+	if (
+		result.error !== null &&
+		isEagainError(result.stderr) &&
+		!abortSignal.aborted
+	) {
 		result = await run(true);
 	}
 
