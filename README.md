@@ -31,9 +31,8 @@ Install via `pi install npm:@ladbabynpm/picc-glob`.
 | `toolName` | `config.json` | `"Glob"` \| `"find"` | `"Glob"` |
 | `PICC_GLOB_TOOL_NAME` | env | `"Glob"` \| `"find"` | — |
 | `PICC_GLOB_CONFIG_PATH` | env | absolute path to a config.json | sibling of `index.ts` |
-| `PI_GLOB_NO_IGNORE` | env | truthy = add `--no-ignore` | on |
-| `PI_GLOB_HIDDEN` | env | truthy = add `--hidden` | on |
-| `PI_GLOB_TIMEOUT_SECONDS` | env | timeout in seconds | 20 (60 on WSL) |
+| `PICC_GLOB_NO_IGNORE` | env | truthy = add `--no-ignore` | on |
+| `PICC_GLOB_HIDDEN` | env | truthy = add `--hidden` | on |
 
 Precedence for the tool name: `PICC_GLOB_TOOL_NAME` env > `config.json` > `"Glob"`.
 

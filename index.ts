@@ -16,15 +16,15 @@
  *     a port of `utils/glob.ts` `extractGlobBaseDirectory` (rg `--glob` only
  *     accepts relative patterns).
  *   - `--no-ignore` / `--hidden` are on by default, overridable via
- *     `PI_GLOB_NO_IGNORE` / `PI_GLOB_HIDDEN` (mirrors Claude Code's
+ *     `PICC_GLOB_NO_IGNORE` / `PICC_GLOB_HIDDEN` (mirrors Claude Code's
  *     `CLAUDE_CODE_GLOB_NO_IGNORE` / `CLAUDE_CODE_GLOB_HIDDEN`, pi-prefixed).
  *   - Results are relativized against cwd (`toRelativePath`), capped at 100
  *     (`globLimits.maxResults ?? 100`), and the tool result text is Claude
  *     Code's exact format: newline-joined paths, or `"No files found"`, with a
  *     single trailing truncation notice when capped.
- *   - 20 s timeout (60 s on WSL), overridable via `PI_GLOB_TIMEOUT_SECONDS`;
- *     SIGTERM→SIGKILL escalation; EAGAIN ("os error 11") retries once with
- *     `-j 1` — a port of `utils/ripgrep.ts` `ripGrep`/`ripGrepRaw`.
+ *   - 20 s timeout (60 s on WSL); SIGTERM→SIGKILL escalation; EAGAIN
+ *     ("os error 11") retries once with `-j 1` — a port of `utils/ripgrep.ts`
+ *     `ripGrep`/`ripGrepRaw`.
  *
  * Tool name configuration:
  *   - Default: `"Glob"` (Claude Code's actual tool name).
@@ -479,10 +479,7 @@ async function ripGrep(
 	target: string,
 	abortSignal: AbortSignal,
 ): Promise<string[]> {
-	const defaultTimeout = isWsl() ? 60_000 : 20_000;
-	const parsedSeconds =
-		parseInt(process.env.PI_GLOB_TIMEOUT_SECONDS ?? "", 10) || 0;
-	const timeoutMs = parsedSeconds > 0 ? parsedSeconds * 1000 : defaultTimeout;
+	const timeoutMs = isWsl() ? 60_000 : 20_000;
 
 	const run = async (singleThread: boolean): Promise<RipgrepOutcome> =>
 		runRipgrepOnce(args, target, abortSignal, timeoutMs, singleThread);
@@ -594,8 +591,8 @@ async function executeGlob(
 		}
 	}
 
-	const noIgnore = isEnvTruthy(process.env.PI_GLOB_NO_IGNORE ?? "true");
-	const hidden = isEnvTruthy(process.env.PI_GLOB_HIDDEN ?? "true");
+	const noIgnore = isEnvTruthy(process.env.PICC_GLOB_NO_IGNORE ?? "true");
+	const hidden = isEnvTruthy(process.env.PICC_GLOB_HIDDEN ?? "true");
 	const args = [
 		"--files",
 		"--glob",
