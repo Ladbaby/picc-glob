@@ -4,8 +4,7 @@ Claude Code-style **Glob** (file finder) tool for [pi](https://pi.dev) — a fai
 
 Part of [picc](https://github.com/Ladbaby/picc), a pi agent setup mirroring Claude Code's harness.
 
-> pi's built-in `find` uses `fd` and different defaults, so it is *not* a faithful
-> port of Claude Code. This extension replicates Claude Code's `Glob` exactly:
+> pi's built-in `find` uses `fd` and different defaults. This extension replicates Claude Code's `Glob` exactly:
 > `rg --files --glob <pattern> --sort=modified --no-ignore --hidden <dir>`.
 
 ## Usage
