@@ -5,27 +5,6 @@
  * exposes as "find"). Claude Code's Glob is backed by **ripgrep**, not the Unix
  * `find` or a glob library:
  *
- *   rg --files --glob <pattern> --sort=modified --no-ignore --hidden <dir>
- *
- * Behavior replicated from `replications/claude-code`:
- *   - Input schema: `{ pattern: string, path?: string }` (verbatim from
- *     `tools/GlobTool/GlobTool.ts` / `Glob_schema.json`).
- *   - `path` is expanded (`~`, POSIX-style Windows paths, relative → absolute)
- *     via a port of `utils/path.ts` `expandPath`.
- *   - Absolute `pattern`s are split into a base directory + relative pattern via
- *     a port of `utils/glob.ts` `extractGlobBaseDirectory` (rg `--glob` only
- *     accepts relative patterns).
- *   - `--no-ignore` / `--hidden` are on by default, overridable via
- *     `PICC_GLOB_NO_IGNORE` / `PICC_GLOB_HIDDEN` (mirrors Claude Code's
- *     `CLAUDE_CODE_GLOB_NO_IGNORE` / `CLAUDE_CODE_GLOB_HIDDEN`, pi-prefixed).
- *   - Results are relativized against cwd (`toRelativePath`), capped at 100
- *     (`globLimits.maxResults ?? 100`), and the tool result text is Claude
- *     Code's exact format: newline-joined paths, or `"No files found"`, with a
- *     single trailing truncation notice when capped.
- *   - 20 s timeout (60 s on WSL); SIGTERM→SIGKILL escalation; EAGAIN
- *     ("os error 11") retries once with `-j 1` — a port of `utils/ripgrep.ts`
- *     `ripGrep`/`ripGrepRaw`.
- *
  * Tool name configuration:
  *   - Default: `"Glob"` (Claude Code's actual tool name).
  *   - Set `config.json` `toolName` to `"find"` (default location
@@ -33,12 +12,6 @@
  *     `PICC_GLOB_TOOL_NAME=find`. Valid values: `"Glob"`, `"find"`.
  *
  * Requires `rg` (ripgrep) on PATH.
- *
- * References:
- * - Claude Code Glob tool: tools/GlobTool/GlobTool.ts (+ prompt.ts, UI.tsx)
- * - Claude Code glob logic: utils/glob.ts
- * - Claude Code ripgrep: utils/ripgrep.ts
- * - Claude Code path helpers: utils/path.ts
  */
 
 import { spawn } from "node:child_process";
@@ -126,16 +99,10 @@ function loadToolName(): ToolName {
 // Constants
 // ============================================================================
 
-/** Mirrors Claude Code `globLimits.maxResults ?? 100` (GlobTool.ts). */
 const DEFAULT_LIMIT = 100;
 
-/** Mirrors Claude Code `utils/ripgrep.ts` MAX_BUFFER_SIZE (20 MB). */
 const MAX_BUFFER_SIZE = 20_000_000;
 
-/**
- * Tool description — verbatim from Claude Code `tools/GlobTool/prompt.ts`
- * (`Glob_description.md`).
- */
 const DESCRIPTION = `- Fast file pattern matching tool that works with any codebase size
 - Supports glob patterns like "**/*.js" or "src/**/*.ts"
 - Returns matching file paths sorted by modification time
@@ -146,7 +113,7 @@ const TRUNCATION_NOTICE =
 	"(Results are truncated. Consider using a more specific path or pattern.)";
 
 // ============================================================================
-// Path helpers (ports of claude-code utils/path.ts)
+// Path helpers
 // ============================================================================
 
 function isWindows(): boolean {
@@ -162,7 +129,7 @@ function isWsl(): boolean {
 }
 
 /**
- * Port of claude-code `expandPath(path, baseDir)`. Handles `~`, POSIX-style
+ * Handles `~`, POSIX-style
  * Windows paths (`/c/Users/...`), and relative→absolute resolution.
  */
 function posixPathToWindowsPath(posixPath: string): string {
@@ -190,7 +157,7 @@ function expandPath(input: string, baseDir: string): string {
 }
 
 /**
- * Port of claude-code `toRelativePath`: relativize against cwd, keeping the
+ * relativize against cwd, keeping the
  * absolute path when it would escape cwd (starts with `..`).
  */
 function toRelativePath(absolutePath: string, cwd: string): string {
@@ -219,7 +186,7 @@ function resolveRgPath(p: string, searchDir: string): string {
 }
 
 /**
- * Port of claude-code `extractGlobBaseDirectory`: split an absolute glob
+ * split an absolute glob
  * pattern into a static base directory and the remaining relative pattern
  * (rg `--glob` only accepts relative patterns).
  */
@@ -262,7 +229,7 @@ function extractGlobBaseDirectory(pattern: string): {
 }
 
 // ============================================================================
-// Ripgrep execution (port of claude-code utils/ripgrep.ts)
+// Ripgrep execution
 // ============================================================================
 
 function isEnvTruthy(v: string | undefined): boolean {
