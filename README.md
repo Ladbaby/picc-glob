@@ -1,6 +1,8 @@
 # picc-glob
 
-Claude Code-style **Glob** (file finder) tool for [pi](https://pi.dev) — a faithful port of Claude Code's `Glob` tool (the file-finder Claude Code exposes as "find"), backed by **ripgrep**.
+[![npm downloads](https://img.shields.io/npm/dt/@ladbabynpm/picc-glob.svg)](https://www.npmjs.com/package/@ladbabynpm/picc-glob)
+
+Claude Code style **Glob** (file finder) tool for [pi](https://pi.dev) — a faithful port of Claude Code's `Glob` tool (the file-finder Claude Code exposes as "find"), backed by **ripgrep**.
 
 Part of [picc](https://github.com/Ladbaby/picc), a pi agent setup mirroring Claude Code's harness.
 
@@ -50,10 +52,3 @@ Precedence for the tool name: `PICC_GLOB_TOOL_NAME` env > `config.json` > `"Glob
 No `any`; top-level imports only; strict TypeScript (ES2022, bundler resolution).
 Dependencies beyond `node:*` are limited to `typebox` and
 `@earendil-works/pi-coding-agent` (both bundled with pi).
-
-## References
-
-- Claude Code `Glob` tool: `replications/claude-code/tools/GlobTool/GlobTool.ts`
-- Claude Code glob logic: `replications/claude-code/utils/glob.ts`
-- Claude Code ripgrep: `replications/claude-code/utils/ripgrep.ts`
-- Claude Code path helpers: `replications/claude-code/utils/path.ts`
