@@ -1,52 +1,52 @@
 {
-	"name": "@ladbabynpm/picc-glob",
-	"version": "0.1.0",
-	"description": "Claude Code style Glob (file finder) tool for pi — a faithful port backed by ripgrep.",
-	"type": "module",
-	"main": "index.ts",
-	"keywords": [
-		"pi",
-		"pi-package",
-		"pi-extension",
-		"glob",
-		"find",
-		"ripgrep",
-		"claude-code"
-	],
-	"license": "MIT",
-	"author": "ladbabynpm",
-	"repository": {
-		"type": "git",
-		"url": "https://github.com/Ladbaby/picc-glob.git"
-	},
-	"homepage": "https://github.com/Ladbaby/picc-glob",
-	"bugs": {
-		"url": "https://github.com/Ladbaby/picc-glob/issues"
-	},
-	"files": [
-		"index.ts",
-		"README.md",
-		"LICENSE"
-	],
-	"pi": {
-		"extensions": [
-			"./index.ts"
-		]
-	},
-	"peerDependencies": {
-		"@earendil-works/pi-coding-agent": "*",
-		"typebox": "*"
-	},
-	"scripts": {
-		"lint": "biome check index.ts",
-		"lint:fix": "biome check --write index.ts",
-		"typecheck": "tsc --noEmit"
-	},
-	"devDependencies": {
-		"@biomejs/biome": "^2.5.5",
-		"@types/node": "^24.0.0"
-	},
-	"publishConfig": {
-		"access": "public"
-	}
+  "name": "@ladbabynpm/picc-glob",
+  "version": "0.1.0",
+  "description": "Claude Code style Glob (file finder) tool for pi — a faithful port backed by ripgrep.",
+  "type": "module",
+  "main": "index.ts",
+  "keywords": [
+    "pi",
+    "pi-package",
+    "pi-extension",
+    "glob",
+    "find",
+    "ripgrep",
+    "claude-code"
+  ],
+  "license": "MIT",
+  "author": "ladbabynpm",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Ladbaby/picc-glob.git"
+  },
+  "homepage": "https://github.com/Ladbaby/picc-glob",
+  "bugs": {
+    "url": "https://github.com/Ladbaby/picc-glob/issues"
+  },
+  "files": [
+    "index.ts",
+    "README.md",
+    "LICENSE"
+  ],
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "typebox": "*"
+  },
+  "scripts": {
+    "lint": "biome check index.ts",
+    "lint:fix": "biome check --write index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.5",
+    "@types/node": "^24.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
 }
